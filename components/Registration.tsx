@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Department, HospitalName, PatientType, Patient, BedStatus, Invoice, Ward, UserRole } from '../types';
-import { Search, UserPlus, CreditCard, ChevronRight, Calendar, Banknote, Receipt, Plus, X, Trash2, Printer, FileText, CheckCircle, BedDouble, Activity, Shield, Users, Clock, AlertCircle, IndianRupee, Gavel } from 'lucide-react';
+import { Search, UserPlus, CreditCard, ChevronRight, Calendar, Banknote, Receipt, Plus, X, Trash2, Printer, FileText, CheckCircle, BedDouble, Activity, Shield, Users, Clock, AlertCircle, IndianRupee, Gavel, Mic, CalendarClock } from 'lucide-react';
 import { HOSPITAL_DEPARTMENTS, MOCK_AUTH_DB } from '../services/mockData';
 import SearchableSelect from './SearchableSelect';
 
@@ -11,14 +11,20 @@ interface RegistrationProps {
   selectedHospital: HospitalName | 'All';
   patients: Patient[];
   wards: Ward[];
+  updateBedStatus?: (wardId: string, bedId: string, status: BedStatus, patientId?: string) => void;
 }
 
 interface RegistrationReceipt {
   patient: Patient;
   invoice: Invoice;
+  appointment?: {
+      date: string;
+      time: string;
+      doctor: string;
+  };
 }
 
-const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, selectedHospital, patients, wards }) => {
+const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, selectedHospital, patients, wards, updateBedStatus }) => {
   const [activeTab, setActiveTab] = useState<'OPD' | 'IPD'>('OPD');
   const [lastReceipt, setLastReceipt] = useState<RegistrationReceipt | null>(null);
 
@@ -34,6 +40,9 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
 
   // Common / OPD Form State
   const [opdMode, setOpdMode] = useState<'New' | 'Existing'>('New');
+  // IPD Mode State: Existing Patient vs New Direct Admission
+  const [ipdMode, setIpdMode] = useState<'Existing' | 'New'>('Existing');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [opdForm, setOpdForm] = useState({
       uhid: '',
@@ -45,6 +54,11 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
       paymentMode: 'Cash',
       legalStatus: 'Non-MLC' as 'MLC' | 'Non-MLC'
   });
+
+  // Appointment Scheduling State
+  const [scheduleFollowUp, setScheduleFollowUp] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState('');
 
   // OPD Billing State
   const [opdBilling, setOpdBilling] = useState({
@@ -108,17 +122,47 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
       return `MMC-${code}-${Math.floor(100000 + Math.random() * 900000)}`;
   };
 
+  // Mock Slots Generator
+  const generateSlots = () => {
+      return ['09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM', '12:00 PM', '04:00 PM', '04:30 PM', '05:00 PM'];
+  };
+
+  // Speech Recognition Helper
+  const startListening = (setter: (val: string) => void, currentVal: string = '') => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setter(currentVal ? `${currentVal} ${transcript}` : transcript);
+      };
+      recognition.start();
+    } else {
+      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+    }
+  };
+
+  const scrollToTop = () => {
+      const container = document.getElementById('main-scroll-container');
+      if (container) {
+          container.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+  };
+
   const handleOpdSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
       // Use uhid from form if Existing, else generate
       const uhid = opdMode === 'Existing' && opdForm.uhid ? opdForm.uhid : generateUHID(opdForm.hospital);
-      
+      const safeAge = parseInt(opdForm.age) || 0;
+
       const newPatient: Patient = {
           id: Date.now().toString(),
           uhid: uhid,
-          name: opdForm.name,
-          age: parseInt(opdForm.age),
+          name: opdForm.name || 'Unknown Patient',
+          age: safeAge,
           gender: opdForm.gender as any,
           mobile: opdForm.mobile,
           address: opdForm.address,
@@ -159,18 +203,72 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
 
       setLastReceipt({
           patient: newPatient,
-          invoice: newInvoice
+          invoice: newInvoice,
+          appointment: scheduleFollowUp && appointmentDate && appointmentTime ? {
+              date: appointmentDate,
+              time: appointmentTime,
+              doctor: opdForm.doctor || 'Duty Doctor'
+          } : undefined
       });
       
+      // Scroll to top
+      scrollToTop();
+
       // Reset Form
       setOpdForm(prev => ({ ...prev, uhid: '', name: '', age: '', mobile: '', address: '', idProofNumber: '', abha: '', legalStatus: 'Non-MLC' }));
       setSearchQuery('');
       setOpdBilling({scheme: 'General', regFee: 10, consultFee: 50, discount: 0, tax: 0});
+      setScheduleFollowUp(false);
+      setAppointmentDate('');
+      setAppointmentTime('');
   };
 
   const handleIpdSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!selectedPatientForAdmission) return;
+      
+      // Determine patient source: Existing or New Direct Admission
+      let admissionPatient: Patient | null = null;
+
+      if (ipdMode === 'Existing') {
+          if (!selectedPatientForAdmission) return;
+          admissionPatient = selectedPatientForAdmission;
+      } else {
+          // Validate New Patient Fields (using opdForm state which holds demographics)
+          if (!opdForm.name) {
+              alert("Please complete the patient demographics (Name, Age, Mobile) for new admission.");
+              return;
+          }
+          
+          const safeAge = parseInt(opdForm.age) || 0;
+
+          admissionPatient = {
+              id: Date.now().toString(),
+              uhid: generateUHID(ipdForm.hospital),
+              name: opdForm.name,
+              age: safeAge,
+              gender: opdForm.gender as any,
+              mobile: opdForm.mobile,
+              address: opdForm.address,
+              type: PatientType.IPD, // Directly IPD
+              hospital: ipdForm.hospital,
+              department: ipdForm.department,
+              doctor: ipdForm.doctor || 'Duty Doctor',
+              status: 'Active',
+              admissionDate: ipdForm.admissionDate.split('T')[0],
+              idProof: { type: opdForm.idProofType, number: opdForm.idProofNumber },
+              abhaId: opdForm.abha,
+              legalStatus: opdForm.legalStatus
+          };
+      }
+
+      if (!admissionPatient) return;
+
+      // Check for Double Booking / Already Admitted
+      // Strict check: if status is active IPD, block.
+      if (ipdMode === 'Existing' && admissionPatient.type === PatientType.IPD && admissionPatient.status === 'Active') {
+          alert(`Patient ${admissionPatient.name} is ALREADY admitted in ${admissionPatient.ward || 'a ward'} (Bed: ${admissionPatient.bedNumber || 'Unassigned'}). Cannot re-admit active patient.`);
+          return;
+      }
 
       const admissionId = `IPD-${Math.floor(Math.random() * 100000)}`;
       const admissionType = ipdForm.admissionType;
@@ -180,7 +278,7 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
       const advance = isPaid ? ipdForm.advanceAmount : 0;
 
       const updatedPatient: Patient = {
-          ...selectedPatientForAdmission,
+          ...admissionPatient,
           type: PatientType.IPD,
           admissionDate: ipdForm.admissionDate.split('T')[0],
           admissionId: admissionId,
@@ -188,6 +286,7 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
           ward: selectedWardData?.name,
           bedNumber: selectedWardData?.beds.find(b => b.id === ipdForm.bedId)?.number,
           diagnosis: ipdForm.diagnosis,
+          status: 'Active', // Ensure active status
           admissionType: admissionType as any,
           insuranceDetails: admissionType === 'Insurance' ? {
               tpaName: ipdForm.tpaName,
@@ -218,15 +317,27 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
 
       onRegister(updatedPatient); 
       onAddInvoice(newInvoice);
+
+      // CRITICAL: Update the Bed Status to link this patient to the bed
+      if (updateBedStatus && ipdForm.wardId && ipdForm.bedId) {
+          updateBedStatus(ipdForm.wardId, ipdForm.bedId, BedStatus.OCCUPIED, updatedPatient.id);
+      }
       
       setLastReceipt({
           patient: updatedPatient,
           invoice: newInvoice
       });
 
+      // Scroll to top
+      scrollToTop();
+
       // Reset
       setSelectedPatientForAdmission(null);
       setIpdForm(prev => ({ ...prev, diagnosis: '', wardId: '', bedId: '', emergencyName: '', emergencyMobile: '', advanceAmount: 500 }));
+      if (ipdMode === 'New') {
+          // Clear demographics if we just created a new patient
+          setOpdForm(prev => ({ ...prev, name: '', age: '', mobile: '', address: '', idProofNumber: '', abha: '' }));
+      }
   };
 
   // Search Helpers
@@ -259,8 +370,11 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
       setOpdBilling(prev => ({...prev, regFee: 0}));
   };
 
-  const inputClass = "w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all";
-  const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1";
+  const inputClass = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed";
+  const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 ml-1";
+
+  // Check active admission for selected patient
+  const isSelectedPatientActiveIPD = selectedPatientForAdmission?.type === PatientType.IPD && selectedPatientForAdmission?.status === 'Active';
 
   return (
     <div className="space-y-6 animate-slide-down">
@@ -268,15 +382,15 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
         {/* Receipt Modal Portal */}
         {lastReceipt && createPortal(
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
-                    <div className={`${lastReceipt.invoice.amount === 0 ? 'bg-indigo-600' : 'bg-green-600'} p-6 text-center text-white`}>
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-green-600 p-6 text-center text-white flex-shrink-0">
                         <CheckCircle className="w-12 h-12 mx-auto mb-3 text-white/90" />
                         <h2 className="text-xl font-bold">
                             {lastReceipt.patient.type === 'OPD' ? 'OPD Registration Successful' : 'IPD Admission Successful'}
                         </h2>
                         <p className="text-white/90 opacity-90 text-sm mt-1">UHID: {lastReceipt.patient.uhid}</p>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
                         <div className="flex justify-between border-b border-slate-100 pb-2">
                             <span className="text-xs text-slate-500 font-bold uppercase">Patient Name</span>
                             <span className="font-bold text-slate-800">{lastReceipt.patient.name}</span>
@@ -298,7 +412,7 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
                         {lastReceipt.patient.type === 'IPD' && (
                             <div className="flex justify-between border-b border-slate-100 pb-2">
                                 <span className="text-xs text-slate-500 font-bold uppercase">Ward / Bed</span>
-                                <span className="font-bold text-slate-800">{lastReceipt.patient.ward} / {lastReceipt.patient.bedNumber}</span>
+                                <span className="font-bold text-slate-800">{lastReceipt.patient.ward || 'Not Assigned'} / {lastReceipt.patient.bedNumber || 'N/A'}</span>
                             </div>
                         )}
                         <div className="flex justify-between border-b border-slate-100 pb-2">
@@ -317,16 +431,34 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
                              </div>
                         )}
 
+                        {/* Appointment Details */}
+                        {lastReceipt.appointment && (
+                            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mt-2 animate-in fade-in">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <CalendarClock className="w-4 h-4 text-blue-600" />
+                                    <span className="text-xs font-bold text-blue-800 uppercase">Follow-up Scheduled</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-slate-700">
+                                    <span>{new Date(lastReceipt.appointment.date).toLocaleDateString()}</span>
+                                    <span className="font-bold">{lastReceipt.appointment.time}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">Dr. {lastReceipt.appointment.doctor}</p>
+                            </div>
+                        )}
+
                         <div className="flex justify-between pt-2">
-                            <span className="text-xs text-slate-500 font-bold uppercase">Total Paid</span>
-                            <span className="font-bold text-xl text-slate-800">₹ {lastReceipt.invoice.amount}</span>
+                            <span className="text-xs text-slate-500 font-bold uppercase">Total Payable</span>
+                            <div className="bg-slate-200/50 px-3 py-1 rounded text-slate-800 font-bold text-xl">₹ {lastReceipt.invoice.amount}</div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3 mt-4">
                             <button onClick={() => alert("Printing...")} className="flex items-center justify-center gap-2 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50">
                                 <Printer className="w-4 h-4" /> Print Receipt
                             </button>
-                            <button onClick={() => setLastReceipt(null)} className="flex items-center justify-center gap-2 py-2 bg-blue-600 rounded-lg text-sm font-bold text-white hover:bg-blue-700">
+                            <button onClick={() => {
+                                setLastReceipt(null);
+                                scrollToTop();
+                            }} className="flex items-center justify-center gap-2 py-2 bg-blue-600 rounded-lg text-sm font-bold text-white hover:bg-blue-700">
                                 Close
                             </button>
                         </div>
@@ -391,11 +523,11 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
 
                     {opdMode === 'Existing' && (
                         <div className="mb-6 relative">
-                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                             <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                              <input 
                                 type="text" 
                                 placeholder="Search UHID or Mobile Number..." 
-                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:border-blue-500 outline-none"
+                                className={`${inputClass} pl-10`}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                              />
@@ -439,7 +571,10 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div><label className={labelClass}>Full Name <span className="text-red-500">*</span></label><input required type="text" className={inputClass} value={opdForm.name} onChange={e => setOpdForm({...opdForm, name: e.target.value})} /></div>
+                                <div>
+                                    <label className={labelClass}>Full Name <span className="text-red-500">*</span> <button type="button" onClick={() => startListening((val) => setOpdForm({...opdForm, name: val}), opdForm.name)} className="ml-2 text-blue-600 hover:bg-blue-100 p-0.5 rounded-full inline-block" title="Speech to Text"><Mic className="w-3 h-3 inline"/></button></label>
+                                    <input required type="text" className={inputClass} value={opdForm.name} onChange={e => setOpdForm({...opdForm, name: e.target.value})} />
+                                </div>
                                 <div><label className={labelClass}>Mobile <span className="text-red-500">*</span></label><input required type="tel" maxLength={10} className={inputClass} value={opdForm.mobile} onChange={e => setOpdForm({...opdForm, mobile: e.target.value})} /></div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -453,7 +588,10 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
                                 <div><label className={labelClass}>ABHA ID</label><input type="text" className={inputClass} placeholder="Optional" value={opdForm.abha} onChange={e => setOpdForm({...opdForm, abha: e.target.value})} /></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className={labelClass}>Address</label><input type="text" className={inputClass} value={opdForm.address} onChange={e => setOpdForm({...opdForm, address: e.target.value})} /></div>
+                                <div>
+                                    <label className={labelClass}>Address <button type="button" onClick={() => startListening((val) => setOpdForm({...opdForm, address: val}), opdForm.address)} className="ml-2 text-blue-600 hover:bg-blue-100 p-0.5 rounded-full inline-block" title="Speech to Text"><Mic className="w-3 h-3 inline"/></button></label>
+                                    <input type="text" className={inputClass} value={opdForm.address} onChange={e => setOpdForm({...opdForm, address: e.target.value})} />
+                                </div>
                                 <div>
                                     <label className={labelClass}>ID Proof</label>
                                     <div className="flex gap-2">
@@ -493,85 +631,103 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
                             </div>
                         </div>
 
-                        {/* Registration Billing Section (Moved inside Form) */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 shadow-sm mb-6">
-                            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2 mb-4 uppercase">
-                                <CreditCard className="w-4 h-4 text-green-600" /> Registration Billing
-                            </h3>
-                            
-                            <div className="space-y-3 mb-4">
-                                    <div>
-                                    <label className={labelClass}>Patient Type / Scheme</label>
-                                    <select 
-                                        className={inputClass} 
-                                        value={opdBilling.scheme} 
-                                        onChange={e => setOpdBilling({...opdBilling, scheme: e.target.value})}
-                                    >
-                                        <option value="General">General (Paid)</option>
-                                        <option value="Free">Free (Zero Bill)</option>
-                                        <option value="Ayushman Bharat">Ayushman Bharat</option>
-                                        <option value="BPL">BPL (Below Poverty Line)</option>
-                                        <option value="Staff">Hospital Staff (Waived)</option>
-                                    </select>
-                                    </div>
-
-                                    <div className={`space-y-3 transition-opacity duration-300 ${opdBilling.scheme !== 'General' ? 'opacity-50 pointer-events-none' : ''}`}>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className={labelClass}>Reg. Fee</label><input type="number" className={inputClass} value={opdBilling.regFee} onChange={e => setOpdBilling({...opdBilling, regFee: Number(e.target.value)})} /></div>
-                                        <div><label className={labelClass}>Consult Fee</label><input type="number" className={inputClass} value={opdBilling.consultFee} onChange={e => setOpdBilling({...opdBilling, consultFee: Number(e.target.value)})} /></div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className={labelClass}>Taxes</label><input type="number" className={inputClass} value={opdBilling.tax} onChange={e => setOpdBilling({...opdBilling, tax: Number(e.target.value)})} /></div>
-                                        <div><label className={labelClass}>Discount</label><input type="number" className={inputClass} value={opdBilling.discount} onChange={e => setOpdBilling({...opdBilling, discount: Number(e.target.value)})} /></div>
-                                    </div>
-                                    </div>
+                        {/* Follow-up Appointment Scheduling */}
+                        <div className="mb-6 border-t border-slate-100 pt-4">
+                            <div className="flex items-center gap-2 mb-4">
+                                <input 
+                                    type="checkbox" 
+                                    id="scheduleFollowUp"
+                                    checked={scheduleFollowUp}
+                                    onChange={(e) => setScheduleFollowUp(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                                <label htmlFor="scheduleFollowUp" className="text-sm font-bold text-slate-700 select-none cursor-pointer flex items-center gap-2">
+                                    <CalendarClock className="w-4 h-4 text-blue-600" /> Schedule Follow-up Appointment
+                                </label>
                             </div>
 
-                            <div className="border-t border-slate-200 pt-4 mb-4">
-                                    <div className="flex justify-between items-center mb-1 text-slate-500 text-sm">
-                                        <span>Subtotal</span>
-                                        <span>₹{opdBilling.scheme === 'General' ? (Number(opdBilling.regFee) + Number(opdBilling.consultFee)) : 0}</span>
+                            {scheduleFollowUp && (
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                                    <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3">Select Appointment Slot</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className={labelClass}>Follow-up Date</label>
+                                            <input 
+                                                type="date" 
+                                                min={new Date().toISOString().split('T')[0]}
+                                                className={inputClass} 
+                                                value={appointmentDate} 
+                                                onChange={(e) => {
+                                                    setAppointmentDate(e.target.value);
+                                                    setAppointmentTime(''); // Reset time when date changes
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Available Slots (Dr. {opdForm.doctor || 'Duty Doctor'})</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {appointmentDate ? generateSlots().map(slot => (
+                                                    <button
+                                                        key={slot}
+                                                        type="button"
+                                                        onClick={() => setAppointmentTime(slot)}
+                                                        className={`px-2 py-2 text-xs font-bold rounded border transition-all ${appointmentTime === slot ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-blue-200 hover:border-blue-400'}`}
+                                                    >
+                                                        {slot}
+                                                    </button>
+                                                )) : (
+                                                    <div className="col-span-3 text-xs text-slate-400 italic py-2">Select a date first.</div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center mb-3 text-slate-500 text-sm">
-                                        <span>Tax</span>
-                                        <span>₹{opdBilling.scheme === 'General' ? opdBilling.tax : 0}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-lg font-bold text-slate-800">
-                                        <span>Total Payable</span>
-                                        <span>₹{opdTotal}</span>
-                                    </div>
-                            </div>
-
-                            {opdTotal > 0 && (
-                                <div>
-                                    <label className={labelClass}>Payment Mode</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['Cash', 'UPI', 'Card', 'Credit'].map(mode => (
-                                            <button 
-                                                key={mode}
-                                                type="button"
-                                                onClick={() => setOpdForm({...opdForm, paymentMode: mode})}
-                                                className={`py-1.5 text-xs font-bold rounded border ${opdForm.paymentMode === mode ? 'bg-green-100 text-green-700 border-green-300' : 'bg-white border-slate-200 text-slate-500'}`}
-                                            >
-                                                {mode}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    {appointmentDate && appointmentTime && (
+                                        <div className="flex items-center gap-2 text-xs text-blue-800 bg-blue-100/50 p-2 rounded border border-blue-200">
+                                            <CheckCircle className="w-4 h-4" />
+                                            <span>Appointment confirmed for <strong>{new Date(appointmentDate).toLocaleDateString()}</strong> at <strong>{appointmentTime}</strong> with <strong>{opdForm.doctor || 'Duty Doctor'}</strong></span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                            {opdBilling.scheme !== 'General' && (
-                                    <div className="bg-indigo-50 text-indigo-700 text-xs p-2 rounded border border-indigo-100 font-medium">
-                                        Bill Amount Waived under {opdBilling.scheme}
-                                    </div>
+                        </div>
+
+                        {/* Registration Billing Section (Moved inside Form) */}
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Billing Information</h4>
+                            <div className="grid grid-cols-2 gap-4 mb-2">
+                                <div>
+                                    <label className={labelClass}>Scheme / Category</label>
+                                    <select className={inputClass} value={opdBilling.scheme} onChange={e => setOpdBilling({...opdBilling, scheme: e.target.value})}>
+                                        <option>General</option>
+                                        <option>Ayushman Bharat</option>
+                                        <option>BPL</option>
+                                        <option>Staff</option>
+                                        <option>Senior Citizen</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Payment Mode</label>
+                                    <select className={inputClass} value={opdForm.paymentMode} onChange={e => setOpdForm({...opdForm, paymentMode: e.target.value})}>
+                                        <option>Cash</option>
+                                        <option>UPI</option>
+                                        <option>Card</option>
+                                    </select>
+                                </div>
+                            </div>
+                            {opdBilling.scheme === 'General' && (
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div><label className={labelClass}>Reg Fee</label><input type="number" className={inputClass} value={opdBilling.regFee} onChange={e => setOpdBilling({...opdBilling, regFee: Number(e.target.value)})} /></div>
+                                    <div><label className={labelClass}>Consultation</label><input type="number" className={inputClass} value={opdBilling.consultFee} onChange={e => setOpdBilling({...opdBilling, consultFee: Number(e.target.value)})} /></div>
+                                    <div><label className={labelClass}>Total Payable</label><div className="px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-800">₹ {opdTotal}</div></div>
+                                </div>
                             )}
                         </div>
-                        
-                         <div className="flex justify-end gap-3 mt-8">
-                             <button type="button" className="px-6 py-2 border border-slate-300 rounded-lg font-bold text-slate-600 hover:bg-slate-50">Clear Form</button>
-                             <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md flex items-center gap-2">
-                                <Receipt className="w-4 h-4" /> Register & Generate Bill
-                             </button>
-                         </div>
+
+                        <div className="flex justify-end pt-2">
+                            <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2">
+                                <Receipt className="w-4 h-4" /> Register & Generate Invoice
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -580,198 +736,146 @@ const Registration: React.FC<RegistrationProps> = ({ onRegister, onAddInvoice, s
         {/* IPD FLOW */}
         {activeTab === 'IPD' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
-                        <BedDouble className="w-5 h-5 text-purple-600" /> Patient Admission (IPD)
-                    </h3>
-
-                    {/* Step 1: Select Patient */}
-                    {!selectedPatientForAdmission ? (
-                        <div className="mb-8">
-                            <label className={labelClass}>Search Patient to Admit</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Enter Name, UHID or Mobile..." 
-                                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg text-sm focus:border-purple-500 outline-none"
-                                    onChange={(e) => setIpdSearchQuery(e.target.value)}
-                                />
-                                {ipdSearchQuery && (
-                                     <div className="absolute z-10 w-full bg-white border border-slate-200 shadow-lg mt-1 rounded-lg max-h-60 overflow-y-auto">
-                                         {searchPatients(ipdSearchQuery).map(p => (
-                                             <div key={p.id} onClick={() => {
-                                                 setSelectedPatientForAdmission(p);
-                                                 setIpdForm(prev => ({...prev, hospital: p.hospital, department: p.department})); // Default to patient's OPD dept
-                                             }} className="p-4 hover:bg-purple-50 cursor-pointer border-b border-slate-50 flex justify-between items-center group">
-                                                 <div>
-                                                     <p className="font-bold text-slate-800 group-hover:text-purple-700">{p.name} <span className="text-xs font-normal text-slate-500">({p.age} {p.gender})</span></p>
-                                                     <p className="text-xs text-slate-500">{p.uhid} • {p.mobile}</p>
-                                                 </div>
-                                                 <ChevronRight className="w-4 h-4 text-slate-300" />
-                                             </div>
-                                         ))}
-                                         {searchPatients(ipdSearchQuery).length === 0 && (
-                                             <div className="p-4 text-center">
-                                                 <p className="text-sm text-slate-500 mb-2">Patient not found.</p>
-                                                 <button onClick={() => { setActiveTab('OPD'); setOpdMode('New'); }} className="text-purple-600 font-bold text-sm hover:underline">Register New Patient in OPD First</button>
-                                             </div>
-                                         )}
-                                     </div>
-                                )}
-                            </div>
+                <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <BedDouble className="w-5 h-5 text-purple-600" /> IPD Admission
+                        </h3>
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            <button onClick={() => setIpdMode('Existing')} className={`px-3 py-1 text-xs font-bold rounded ${ipdMode === 'Existing' ? 'bg-white shadow text-purple-700' : 'text-slate-500'}`}>Existing Patient</button>
+                            <button onClick={() => { setIpdMode('New'); setSelectedPatientForAdmission(null); }} className={`px-3 py-1 text-xs font-bold rounded ${ipdMode === 'New' ? 'bg-white shadow text-purple-700' : 'text-slate-500'}`}>New (Direct)</button>
                         </div>
-                    ) : (
-                        <form onSubmit={handleIpdSubmit}>
-                            {/* Selected Patient Summary */}
-                            <div className="bg-purple-50 border border-purple-100 rounded-lg p-4 mb-6 flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-bold text-purple-900">{selectedPatientForAdmission.name}</h4>
-                                    <p className="text-xs text-purple-700">{selectedPatientForAdmission.uhid} • {selectedPatientForAdmission.age}Y / {selectedPatientForAdmission.gender}</p>
-                                </div>
-                                <button type="button" onClick={() => setSelectedPatientForAdmission(null)} className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-white px-3 py-1 rounded border border-slate-200">Change</button>
-                            </div>
+                    </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <label className={labelClass}>Admission Date & Time</label>
-                                    <input type="datetime-local" className={inputClass} required value={ipdForm.admissionDate} onChange={e => setIpdForm({...ipdForm, admissionDate: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Admission Type / Scheme</label>
-                                    <select className={inputClass} value={ipdForm.admissionType} onChange={e => setIpdForm({...ipdForm, admissionType: e.target.value})}>
-                                        <option value="General">General / Cash</option>
-                                        <option value="Free">Free (Zero Bill)</option>
-                                        <option value="Ayushman Bharat">Ayushman Bharat</option>
-                                        <option value="BPL">BPL</option>
-                                        <option value="Insurance">Private Insurance</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            {/* Financial / Deposit Section */}
-                            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <Banknote className="w-4 h-4" /> Financials
-                                </h4>
-                                {ipdForm.admissionType === 'General' ? (
-                                    <div className="grid grid-cols-2 gap-4">
+                    <form onSubmit={handleIpdSubmit}>
+                        {ipdMode === 'Existing' && (
+                            <div className="mb-6 relative">
+                                <label className={labelClass}>Select Patient to Admit</label>
+                                <SearchableSelect 
+                                    options={patients.map(p => ({ label: `${p.name} (${p.uhid})`, value: p.id }))}
+                                    value={selectedPatientForAdmission?.id || ''}
+                                    onChange={(val) => {
+                                        const p = patients.find(pat => pat.id === val);
+                                        setSelectedPatientForAdmission(p || null);
+                                    }}
+                                    placeholder="Search Patient..."
+                                />
+                                {selectedPatientForAdmission && (
+                                    <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg flex justify-between items-center">
                                         <div>
-                                            <label className={labelClass}>Initial Advance / Deposit (₹)</label>
-                                            <input type="number" className={inputClass} required value={ipdForm.advanceAmount} onChange={e => setIpdForm({...ipdForm, advanceAmount: Number(e.target.value)})} />
+                                            <p className="font-bold text-blue-900">{selectedPatientForAdmission.name}</p>
+                                            <p className="text-xs text-blue-700">{selectedPatientForAdmission.age}Y / {selectedPatientForAdmission.gender} • {selectedPatientForAdmission.mobile}</p>
                                         </div>
-                                        <div>
-                                            <label className={labelClass}>Estimated Cost (Optional)</label>
-                                            <input type="number" className={inputClass} placeholder="Approx amount" />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="bg-green-50 text-green-700 text-xs p-3 rounded border border-green-100 font-bold flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4" /> Bill Amount Waived / Covered under {ipdForm.admissionType}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className={labelClass}>Pre-Auth / Card No</label>
-                                                <input type="text" className={inputClass} placeholder="Card No / Pre-Auth ID" />
-                                            </div>
-                                            <div>
-                                                <label className={labelClass}>Approved Amount (₹)</label>
-                                                <input type="number" className={inputClass} value={ipdForm.advanceAmount} onChange={e => setIpdForm({...ipdForm, advanceAmount: Number(e.target.value)})} />
-                                            </div>
-                                        </div>
+                                        <span className={`text-xs font-bold px-2 py-1 rounded ${selectedPatientForAdmission.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+                                            {selectedPatientForAdmission.status}
+                                        </span>
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Bed Allocation */}
-                            <div className="mb-6">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ward & Bed Allocation</h4>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                     <div>
-                                        <label className={labelClass}>Department</label>
-                                        <SearchableSelect options={HOSPITAL_DEPARTMENTS[ipdForm.hospital].map(d => ({label: d, value: d}))} value={ipdForm.department} onChange={(v) => setIpdForm({...ipdForm, department: v as any, wardId: '', bedId: ''})} />
-                                     </div>
-                                     <div>
-                                         <label className={labelClass}>Admitting Doctor <span className="text-red-500">*</span></label>
-                                         <SearchableSelect options={doctorsList.map(d => ({label: d.name, value: d.name}))} value={ipdForm.doctor} onChange={v => setIpdForm({...ipdForm, doctor: v})} />
-                                     </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className={labelClass}>Select Ward</label>
-                                        <select className={inputClass} required value={ipdForm.wardId} onChange={e => setIpdForm({...ipdForm, wardId: e.target.value, bedId: ''})}>
-                                            <option value="">-- Choose Ward --</option>
-                                            {availableWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>Select Bed</label>
-                                        <select className={inputClass} required value={ipdForm.bedId} onChange={e => setIpdForm({...ipdForm, bedId: e.target.value})} disabled={!ipdForm.wardId}>
-                                            <option value="">-- Choose Bed --</option>
-                                            {availableBeds.map(b => <option key={b.id} value={b.id}>{b.number} (Available)</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Insurance Details */}
-                            {ipdForm.admissionType === 'Insurance' && (
-                                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100 animate-in fade-in">
-                                    <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-4">Insurance / TPA Details</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className={labelClass}>TPA / Provider Name</label><input required type="text" className={inputClass} placeholder="e.g. Star Health" value={ipdForm.tpaName} onChange={e => setIpdForm({...ipdForm, tpaName: e.target.value})} /></div>
-                                        <div><label className={labelClass}>Policy / Card Number</label><input required type="text" className={inputClass} placeholder="Policy No." value={ipdForm.policyNumber} onChange={e => setIpdForm({...ipdForm, policyNumber: e.target.value})} /></div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Medical & Emergency */}
-                            <div className="mb-6">
-                                <label className={labelClass}>Provisional Diagnosis / Reason</label>
-                                <textarea className={`${inputClass} h-20 resize-none`} required placeholder="Enter admission reason..." value={ipdForm.diagnosis} onChange={e => setIpdForm({...ipdForm, diagnosis: e.target.value})}></textarea>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div><label className={labelClass}>Emergency Contact Name</label><input required type="text" className={inputClass} value={ipdForm.emergencyName} onChange={e => setIpdForm({...ipdForm, emergencyName: e.target.value})} /></div>
-                                <div><label className={labelClass}>Emergency Mobile</label><input required type="tel" maxLength={10} className={inputClass} value={ipdForm.emergencyMobile} onChange={e => setIpdForm({...ipdForm, emergencyMobile: e.target.value})} /></div>
-                            </div>
-
-                            <div className="flex justify-end pt-4 border-t border-slate-100">
-                                <button type="submit" className="px-8 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-md flex items-center gap-2">
-                                    <BedDouble className="w-5 h-5" /> Confirm Admission & Generate Bill
-                                </button>
-                            </div>
-                        </form>
-                    )}
-                </div>
-
-                <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-4 text-sm uppercase">Bed Availability Status</h3>
-                        {selectedHospital === 'All' || !availableWards.length ? (
-                            <div className="text-sm text-slate-500 italic">Select hospital and department in form to view specific ward availability.</div>
-                        ) : (
-                            <div className="space-y-3">
-                                {availableWards.map(w => {
-                                    const total = w.beds.length;
-                                    const free = w.beds.filter(b => b.status === BedStatus.AVAILABLE).length;
-                                    const percent = Math.round((free/total)*100);
-                                    return (
-                                        <div key={w.id} className="border-b border-slate-50 pb-2 last:border-0">
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="font-medium text-slate-700">{w.name}</span>
-                                                <span className={`font-bold ${free === 0 ? 'text-red-500' : 'text-green-600'}`}>{free} Free</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                                <div className={`h-full ${free < 2 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${percent}%`}}></div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
                             </div>
                         )}
-                    </div>
+
+                        {(ipdMode === 'New' || selectedPatientForAdmission) && (
+                            <div className="animate-in fade-in slide-in-from-bottom-2">
+                                {/* If New, show simplified demographics */}
+                                {ipdMode === 'New' && (
+                                    <div className="mb-6 p-4 border border-slate-200 rounded-xl bg-slate-50">
+                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Patient Details</h4>
+                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                            <div><label className={labelClass}>Name</label><input required type="text" className={inputClass} value={opdForm.name} onChange={e => setOpdForm({...opdForm, name: e.target.value})} /></div>
+                                            <div><label className={labelClass}>Mobile</label><input required type="tel" className={inputClass} value={opdForm.mobile} onChange={e => setOpdForm({...opdForm, mobile: e.target.value})} /></div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div><label className={labelClass}>Age</label><input required type="number" className={inputClass} value={opdForm.age} onChange={e => setOpdForm({...opdForm, age: e.target.value})} /></div>
+                                            <div>
+                                                <label className={labelClass}>Gender</label>
+                                                <select className={inputClass} value={opdForm.gender} onChange={e => setOpdForm({...opdForm, gender: e.target.value})}>
+                                                    <option>Male</option><option>Female</option><option>Other</option>
+                                                </select>
+                                            </div>
+                                            <div><label className={labelClass}>Address</label><input type="text" className={inputClass} value={opdForm.address} onChange={e => setOpdForm({...opdForm, address: e.target.value})} /></div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mb-6">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">Admission Details</h4>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div><label className={labelClass}>Admission Date</label><input type="datetime-local" className={inputClass} value={ipdForm.admissionDate} onChange={e => setIpdForm({...ipdForm, admissionDate: e.target.value})} /></div>
+                                        <div><label className={labelClass}>Admitting Doctor</label><SearchableSelect options={doctorsList.map(d => ({label: d.name, value: d.name}))} value={ipdForm.doctor} onChange={v => setIpdForm({...ipdForm, doctor: v})} /></div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className={labelClass}>Hospital Block</label>
+                                            <select className={inputClass} value={ipdForm.hospital} onChange={e => setIpdForm({...ipdForm, hospital: e.target.value as any, wardId: '', bedId: ''})} disabled={selectedHospital !== 'All'}>
+                                                {Object.values(HospitalName).map(h => <option key={h} value={h}>{h}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Department</label>
+                                            <select className={inputClass} value={ipdForm.department} onChange={e => setIpdForm({...ipdForm, department: e.target.value as any, wardId: '', bedId: ''})}>
+                                                {HOSPITAL_DEPARTMENTS[ipdForm.hospital].map(d => <option key={d} value={d}>{d}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className={labelClass}>Select Ward</label>
+                                            <select required className={inputClass} value={ipdForm.wardId} onChange={e => setIpdForm({...ipdForm, wardId: e.target.value, bedId: ''})}>
+                                                <option value="">-- Choose Ward --</option>
+                                                {availableWards.map(w => <option key={w.id} value={w.id}>{w.name} ({w.type})</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Select Bed</label>
+                                            <select required className={inputClass} value={ipdForm.bedId} onChange={e => setIpdForm({...ipdForm, bedId: e.target.value})} disabled={!ipdForm.wardId}>
+                                                <option value="">-- Choose Bed --</option>
+                                                {availableBeds.map(b => <option key={b.id} value={b.id}>{b.number}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className={labelClass}>Provisional Diagnosis</label>
+                                        <input type="text" className={inputClass} value={ipdForm.diagnosis} onChange={e => setIpdForm({...ipdForm, diagnosis: e.target.value})} placeholder="Admitting Diagnosis..." />
+                                    </div>
+                                </div>
+
+                                <div className="mb-6 bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                    <h4 className="text-xs font-bold text-purple-800 uppercase tracking-wider mb-3">Billing & Insurance</h4>
+                                    <div className="grid grid-cols-2 gap-4 mb-2">
+                                        <div>
+                                            <label className={labelClass}>Admission Type</label>
+                                            <select className={inputClass} value={ipdForm.admissionType} onChange={e => setIpdForm({...ipdForm, admissionType: e.target.value})}>
+                                                <option value="General">General (Cash)</option>
+                                                <option value="Insurance">Insurance / TPA</option>
+                                                <option value="Ayushman Bharat">Ayushman Bharat</option>
+                                                <option value="Govt">Govt Scheme</option>
+                                            </select>
+                                        </div>
+                                        {ipdForm.admissionType === 'General' ? (
+                                            <div>
+                                                <label className={labelClass}>Advance Deposit (₹)</label>
+                                                <input type="number" className={inputClass} value={ipdForm.advanceAmount} onChange={e => setIpdForm({...ipdForm, advanceAmount: Number(e.target.value)})} />
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className={labelClass}>Policy / Card Number</label>
+                                                <input type="text" className={inputClass} value={ipdForm.policyNumber} onChange={e => setIpdForm({...ipdForm, policyNumber: e.target.value})} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button type="submit" className="px-6 py-2.5 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 shadow-lg shadow-purple-500/30 flex items-center gap-2">
+                                        <BedDouble className="w-4 h-4" /> Admit Patient
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </form>
                 </div>
             </div>
         )}

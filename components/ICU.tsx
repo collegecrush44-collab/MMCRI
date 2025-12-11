@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Ward, Patient, BedStatus, HospitalName, Department } from '../types';
-import { HeartPulse, Activity, Wind, Thermometer, Droplet, User, AlertTriangle, CheckCircle, Clock, Battery, Zap, BedDouble } from 'lucide-react';
+import { HeartPulse, Activity, Wind, Thermometer, Droplet, User, AlertTriangle, CheckCircle, Clock, Battery, Zap, BedDouble, Wrench } from 'lucide-react';
 
 interface ICUProps {
     wards: Ward[];
@@ -133,17 +132,26 @@ const ICU: React.FC<ICUProps> = ({ wards, patients, selectedHospital, updateBedS
                                     const patient = getPatient(bed.patientId);
                                     const vitals = bed.patientId ? patientVitals[bed.patientId] : null;
                                     const isCritical = vitals && (vitals.spo2 < 92 || vitals.hr > 120);
+                                    const isMaintenance = bed.status === BedStatus.MAINTENANCE;
 
                                     return (
-                                        <div key={bed.id} className={`rounded-xl border p-4 flex flex-col justify-between min-h-[200px] transition-all relative ${getStatusColor(vitals)} ${bed.status === BedStatus.AVAILABLE ? 'border-dashed border-slate-300 bg-slate-50 opacity-60 hover:opacity-100' : 'shadow-sm'}`}>
+                                        <div key={bed.id} className={`rounded-xl border p-4 flex flex-col justify-between min-h-[200px] transition-all relative 
+                                            ${isMaintenance ? 'bg-slate-100 border-slate-300 opacity-70' : getStatusColor(vitals)} 
+                                            ${bed.status === BedStatus.AVAILABLE ? 'border-dashed border-slate-300 bg-green-50/30 opacity-80 hover:opacity-100 hover:bg-green-50' : 'shadow-sm'}`}>
+                                            
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="bg-white/80 px-2 py-1 rounded text-xs font-bold border border-slate-200 shadow-sm">
                                                     {bed.number}
                                                 </div>
                                                 {bed.status === BedStatus.AVAILABLE && (
-                                                    <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">AVAILABLE</span>
+                                                    <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded">AVAILABLE</span>
                                                 )}
-                                                {isCritical && (
+                                                {isMaintenance && (
+                                                    <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded flex items-center gap-1">
+                                                        <Wrench className="w-3 h-3" /> MAINT
+                                                    </span>
+                                                )}
+                                                {isCritical && !isMaintenance && (
                                                     <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-white px-2 py-1 rounded border border-red-100 shadow-sm animate-pulse">
                                                         <AlertTriangle className="w-3 h-3" /> CRITICAL
                                                     </span>
@@ -182,10 +190,15 @@ const ICU: React.FC<ICUProps> = ({ wards, patients, selectedHospital, updateBedS
                                                         </div>
                                                     )}
                                                 </>
-                                            ) : (
+                                            ) : isMaintenance ? (
                                                 <div className="flex-grow flex flex-col items-center justify-center text-slate-400">
-                                                    <BedDouble className="w-8 h-8 mb-2 opacity-50" />
-                                                    <p className="text-sm font-medium">Ready for Admission</p>
+                                                    <Wrench className="w-8 h-8 mb-2 opacity-50" />
+                                                    <p className="text-sm font-medium">Out of Service</p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex-grow flex flex-col items-center justify-center text-green-600/60">
+                                                    <BedDouble className="w-8 h-8 mb-2 opacity-80" />
+                                                    <p className="text-sm font-bold">Ready for Admission</p>
                                                 </div>
                                             )}
                                         </div>

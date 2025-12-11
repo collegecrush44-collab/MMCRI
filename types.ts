@@ -239,6 +239,8 @@ export interface RoundNote {
   doctor: string;
   note: string;
   vitals?: string;
+  attachmentUrl?: string;
+  attachmentType?: 'image' | 'pdf' | 'other';
 }
 
 export interface CareTeamMessage {

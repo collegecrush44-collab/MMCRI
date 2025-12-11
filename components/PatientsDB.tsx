@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Patient, HospitalName, PatientType } from '../types';
-import { Search, Filter, User, Calendar, MapPin, X, Activity, FileText, ShieldCheck, Clock, Gavel, ChevronLeft, ChevronRight, Edit2, Save, Trash2 } from 'lucide-react';
+import { Search, Filter, User, Calendar, MapPin, X, Activity, FileText, ShieldCheck, Clock, Gavel, ChevronLeft, ChevronRight, Edit2, Save, Trash2, UserPlus } from 'lucide-react';
 
 interface PatientsDBProps {
   patients: Patient[];
   selectedHospital: HospitalName | 'All';
   onUpdatePatient?: (patient: Patient) => void;
   onDeletePatient?: (patientId: string) => void;
+  onNavigate?: (module: string) => void;
 }
 
-const PatientsDB: React.FC<PatientsDBProps> = ({ patients, selectedHospital, onUpdatePatient, onDeletePatient }) => {
+const PatientsDB: React.FC<PatientsDBProps> = ({ patients, selectedHospital, onUpdatePatient, onDeletePatient, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'All' | PatientType>('All');
   const [viewProfile, setViewProfile] = useState<Patient | null>(null);
@@ -358,6 +359,14 @@ const PatientsDB: React.FC<PatientsDBProps> = ({ patients, selectedHospital, onU
                   <option value="IPD">IPD</option>
                   <option value="Casualty">Casualty</option>
               </select>
+              {onNavigate && (
+                  <button 
+                    onClick={() => onNavigate('registration')}
+                    className="ml-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm whitespace-nowrap"
+                  >
+                      <UserPlus className="w-4 h-4" /> Add Patient
+                  </button>
+              )}
           </div>
       </div>
 

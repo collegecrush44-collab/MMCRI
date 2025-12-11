@@ -27,12 +27,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all";
-  const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 ml-1";
+  const inputClass = "w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-semibold focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:font-normal";
+  const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 ml-1";
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white max-w-5xl w-full rounded-2xl shadow-xl flex overflow-hidden border border-slate-200 min-h-[550px]">
+      <div className="bg-white max-w-5xl w-full rounded-2xl shadow-xl flex overflow-hidden border border-slate-200 min-h-[600px]">
         
         {/* Left Side: Branding */}
         <div className="w-2/5 bg-gradient-to-br from-blue-700 to-indigo-800 p-12 text-white hidden md:flex flex-col justify-between relative overflow-hidden">
@@ -56,12 +56,43 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="relative z-10">
               <h3 className="text-xs font-bold uppercase tracking-widest text-blue-300 mb-2">Available Credentials (Demo)</h3>
-              <div className="text-[10px] space-y-1 text-blue-100 opacity-80 font-mono bg-black/20 p-3 rounded-lg border border-white/10">
-                  <div className="flex justify-between"><span>Admin</span> <span>admin / password</span></div>
-                  <div className="flex justify-between"><span>K R Hosp</span> <span>krh_admin / password</span></div>
-                  <div className="flex justify-between"><span>Doctor</span> <span>dr_suresh / password</span></div>
-                  <div className="flex justify-between"><span>Nurse</span> <span>nurse_cheluvamba / password</span></div>
-                  <div className="flex justify-between"><span>Reception</span> <span>reception / password</span></div>
+              <div className="text-[10px] space-y-2 text-blue-100 opacity-90 font-mono bg-black/20 p-4 rounded-lg border border-white/10 overflow-y-auto max-h-64 custom-scrollbar">
+                  <div className="border-b border-white/10 pb-2 mb-1">
+                    <div className="flex justify-between items-center"><span className="text-yellow-300 font-bold">SUPER ADMIN</span> <span className="bg-white/10 px-1 rounded">admin / password</span></div>
+                    <p className="text-[8px] text-blue-200 mt-0.5">Access All Hospitals & Modules</p>
+                  </div>
+                  
+                  <div className="border-b border-white/10 pb-2 mb-1">
+                    <div className="flex justify-between items-center"><span className="text-green-300 font-bold">HOSPITAL ADMIN</span> <span className="bg-white/10 px-1 rounded">krh_admin / password</span></div>
+                    <p className="text-[8px] text-blue-200 mt-0.5">Single Hospital Full Access (K R Hospital)</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Receptionist</span> 
+                        <span className="bg-white/10 px-1 rounded">reception / password</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Lab Technician</span> 
+                        <span className="bg-white/10 px-1 rounded">lab_tech / password</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Staff Nurse</span> 
+                        <span className="bg-white/10 px-1 rounded">nurse_cheluvamba / password</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Consultant</span> 
+                        <span className="bg-white/10 px-1 rounded">dr_suresh / password</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Casualty MO</span> 
+                        <span className="bg-white/10 px-1 rounded">casualty / password</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="font-semibold">Blood Bank Manager</span> 
+                        <span className="bg-white/10 px-1 rounded">blood_manager / password</span>
+                    </div>
+                  </div>
               </div>
           </div>
         </div>

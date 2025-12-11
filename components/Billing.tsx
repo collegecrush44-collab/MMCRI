@@ -197,6 +197,9 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
         inv.id.toLowerCase().includes(historyFilter.toLowerCase())
     );
 
+    const inputClass = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed";
+    const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 ml-1";
+
     return (
         <div className="space-y-6 animate-slide-down">
             {/* Header Stats */}
@@ -259,8 +262,8 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                     {/* Invoice Success Modal Portal */}
                     {lastInvoice && createPortal(
                         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90vh] overflow-y-auto">
-                                <div className={`p-6 text-center text-white ${lastInvoice.amount === 0 ? 'bg-indigo-600' : 'bg-green-600'}`}>
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col">
+                                <div className={`p-6 text-center text-white ${lastInvoice.amount === 0 ? 'bg-indigo-600' : 'bg-green-600'} flex-shrink-0`}>
                                     <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
                                         <CheckCircle className="w-8 h-8 text-white" />
                                     </div>
@@ -269,7 +272,7 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                                     </h2>
                                     <p className="text-white/90 text-sm mt-1">Transaction recorded successfully.</p>
                                 </div>
-                                <div className="p-6 bg-slate-50">
+                                <div className="p-6 bg-slate-50 overflow-y-auto custom-scrollbar flex-1">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-xs text-slate-500 uppercase font-bold">Total Amount</span>
                                         <span className="text-lg font-bold text-slate-800">₹ {lastInvoice.amount}</span>
@@ -452,9 +455,9 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Billing Scheme</label>
+                                    <label className={labelClass}>Billing Scheme</label>
                                     <select 
-                                        className="w-full p-2 border border-slate-200 rounded text-sm bg-slate-50"
+                                        className={inputClass}
                                         value={billingScheme}
                                         onChange={(e) => setBillingScheme(e.target.value)}
                                     >
@@ -468,13 +471,13 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
 
                                 {billingScheme === 'General' && (
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+                                        <label className={labelClass}>Payment Mode</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {['Cash', 'Card', 'UPI', 'NEFT'].map(mode => (
                                                 <button
                                                     key={mode}
                                                     onClick={() => setPaymentMode(mode)}
-                                                    className={`py-2 text-xs font-bold rounded border ${paymentMode === mode ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                                    className={`py-3 text-xs font-bold rounded-xl border transition-all ${paymentMode === mode ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
                                                 >
                                                     {mode}
                                                 </button>
@@ -511,14 +514,14 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                      {/* Discharge Modal Portal */}
                      {showDischargeModal && dischargeBillDetails && createPortal(
                         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
-                                <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                                <div className="p-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
                                     <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                                         <LogOut className="w-5 h-5 text-red-600" /> Final Discharge Bill
                                     </h3>
                                     <button onClick={() => setShowDischargeModal(false)} className="text-slate-400 hover:text-slate-600"><Trash2 className="w-5 h-5 rotate-45" /></button>
                                 </div>
-                                <div className="p-6 grid grid-cols-2 gap-8">
+                                <div className="p-6 grid grid-cols-2 gap-8 overflow-y-auto custom-scrollbar flex-1">
                                     <div>
                                         <h4 className="text-xs font-bold text-slate-500 uppercase mb-4 border-b pb-1">Patient Details</h4>
                                         <p className="font-bold text-lg text-slate-800">{dischargeBillDetails.patient.name}</p>
@@ -567,7 +570,7 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                                <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
                                     <button onClick={() => setShowDischargeModal(false)} className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-600">Cancel</button>
                                     <button onClick={handleConfirmDischarge} className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 shadow-sm">
                                         Confirm Payment & Discharge
@@ -612,25 +615,25 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
                     {editingInvoice && createPortal(
                         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-lg text-slate-800">Edit Invoice</h3>
                                     <button onClick={() => setEditingInvoice(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Invoice Amount (₹)</label>
+                                        <label className={labelClass}>Invoice Amount (₹)</label>
                                         <input 
                                             type="number" 
-                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                            className={inputClass}
                                             value={editingInvoice.amount}
                                             onChange={(e) => setEditingInvoice({...editingInvoice, amount: parseFloat(e.target.value) || 0})}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Status</label>
+                                        <label className={labelClass}>Payment Status</label>
                                         <select 
-                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                            className={inputClass}
                                             value={editingInvoice.status}
                                             onChange={(e) => setEditingInvoice({...editingInvoice, status: e.target.value})}
                                         >
@@ -640,9 +643,9 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+                                        <label className={labelClass}>Payment Mode</label>
                                         <select 
-                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                            className={inputClass}
                                             value={editingInvoice.mode}
                                             onChange={(e) => setEditingInvoice({...editingInvoice, mode: e.target.value})}
                                         >
@@ -652,7 +655,7 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
                                             <option value="-">-</option>
                                         </select>
                                     </div>
-                                    <button onClick={saveEditedInvoice} className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Save Changes</button>
+                                    <button onClick={saveEditedInvoice} className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700">Save Changes</button>
                                 </div>
                             </div>
                         </div>,
@@ -661,17 +664,17 @@ const Billing: React.FC<BillingProps> = ({ invoices, onAddInvoice, onUpdateInvoi
 
                     <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                         <div className="relative w-64">
-                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                             <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                              <input 
                                 type="text" 
                                 placeholder="Search Invoice No / Name..." 
-                                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                                className={`${inputClass} pl-10`}
                                 value={historyFilter}
                                 onChange={e => setHistoryFilter(e.target.value)}
                              />
                         </div>
                         <div className="flex gap-2">
-                            <button className="px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-600 hover:bg-slate-50">Export CSV</button>
+                            <button className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 shadow-sm">Export CSV</button>
                         </div>
                     </div>
                     <table className="w-full text-left">

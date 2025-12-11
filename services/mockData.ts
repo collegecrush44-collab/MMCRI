@@ -130,6 +130,67 @@ export const MOCK_AUTH_DB = [
       avatar: 'DV'
     }
   },
+  {
+    username: 'dr_anjali',
+    password: 'password',
+    user: {
+      id: 'U104',
+      name: 'Dr. Anjali (Gen Med)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KR_HOSPITAL,
+      department: Department.GENERAL_MEDICINE,
+      avatar: 'DA'
+    }
+  },
+  {
+    username: 'dr_kumar',
+    password: 'password',
+    user: {
+      id: 'U105',
+      name: 'Dr. Kumar (ENT)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KR_HOSPITAL,
+      department: Department.ENT,
+      avatar: 'DK'
+    }
+  },
+  {
+    username: 'dr_meena',
+    password: 'password',
+    user: {
+      id: 'U106',
+      name: 'Dr. Meena (Ophthal)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KR_HOSPITAL,
+      department: Department.OPHTHALMOLOGY,
+      avatar: 'DM'
+    }
+  },
+  {
+    username: 'dr_arun',
+    password: 'password',
+    user: {
+      id: 'U107',
+      name: 'Dr. Arun (Dermat)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KR_HOSPITAL,
+      department: Department.DERMATOLOGY,
+      avatar: 'DAr'
+    }
+  },
+  {
+    username: 'dr_swathi',
+    password: 'password',
+    user: {
+      id: 'U108',
+      name: 'Dr. Swathi (Psychiatry)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KR_HOSPITAL,
+      department: Department.PSYCHIATRY,
+      avatar: 'DSw'
+    }
+  },
+  
   // --- CHELUVAMBA HOSPITAL CONSULTANTS ---
   {
     username: 'dr_savitha',
@@ -143,7 +204,84 @@ export const MOCK_AUTH_DB = [
       avatar: 'DSa'
     }
   },
-  // --- NEW ROLES FOR DEMO ---
+  {
+    username: 'dr_neha',
+    password: 'password',
+    user: {
+      id: 'U202',
+      name: 'Dr. Neha (Pediatrics)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.CHELUVAMBA,
+      department: Department.PEDIATRICS,
+      avatar: 'DN'
+    }
+  },
+
+  // --- KRISHNAJAMMANI CONSULTANTS ---
+  {
+    username: 'dr_satish',
+    password: 'password',
+    user: {
+      id: 'U301',
+      name: 'Dr. Satish (Cardio)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KRISHNAJAMMANI,
+      department: Department.CARDIOLOGY,
+      avatar: 'DSt'
+    }
+  },
+  {
+    username: 'dr_varun',
+    password: 'password',
+    user: {
+      id: 'U302',
+      name: 'Dr. Varun (Neuro)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KRISHNAJAMMANI,
+      department: Department.NEUROLOGY,
+      avatar: 'DVr'
+    }
+  },
+  {
+    username: 'dr_kavya',
+    password: 'password',
+    user: {
+      id: 'U303',
+      name: 'Dr. Kavya (Onco)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.KRISHNAJAMMANI,
+      department: Department.ONCOLOGY,
+      avatar: 'DKv'
+    }
+  },
+
+  // --- TRAUMA CONSULTANTS ---
+  {
+    username: 'dr_vikram',
+    password: 'password',
+    user: {
+      id: 'U401',
+      name: 'Dr. Vikram (Casualty)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.TRAUMA_CARE,
+      department: Department.EMERGENCY_MEDICINE,
+      avatar: 'DVk'
+    }
+  },
+  {
+    username: 'dr_mahesh',
+    password: 'password',
+    user: {
+      id: 'U402',
+      name: 'Dr. Mahesh (Ortho)',
+      role: UserRole.CONSULTANT,
+      hospital: HospitalName.TRAUMA_CARE,
+      department: Department.ORTHOPAEDICS,
+      avatar: 'DMh'
+    }
+  },
+
+  // --- STAFF ---
   {
     username: 'pharmacist',
     password: 'password',
@@ -192,7 +330,6 @@ export const MOCK_AUTH_DB = [
       avatar: 'DRa'
     }
   },
-  // --- STAFF ---
   {
     username: 'lab_tech',
     password: 'password',
@@ -450,6 +587,60 @@ export const MOCK_PATIENTS: Patient[] = [
     ward: 'Triage / Casualty Red Zone',
     bedNumber: 'TR-2',
     legalStatus: 'Non-MLC'
+  },
+  {
+    id: '8',
+    uhid: 'MMC-KR-24-008',
+    name: 'Kiran Rao',
+    age: 30,
+    gender: 'Male',
+    mobile: '9880011223',
+    type: PatientType.IPD,
+    hospital: HospitalName.KR_HOSPITAL,
+    department: Department.ENT,
+    admissionDate: '2024-05-17',
+    ward: 'ENT Ward',
+    bedNumber: 'ENT-2',
+    diagnosis: 'CSOM Left Ear',
+    doctor: 'Dr. Kumar',
+    status: 'Active',
+    legalStatus: 'Non-MLC'
+  },
+  {
+    id: '9',
+    uhid: 'MMC-KR-24-009',
+    name: 'Meenakshi',
+    age: 65,
+    gender: 'Female',
+    mobile: '8899001122',
+    type: PatientType.IPD,
+    hospital: HospitalName.KR_HOSPITAL,
+    department: Department.OPHTHALMOLOGY,
+    admissionDate: '2024-05-18',
+    ward: 'Ophthalmology Ward',
+    bedNumber: 'OPH-4',
+    diagnosis: 'Senile Cataract - RE',
+    doctor: 'Dr. Meena',
+    status: 'Active',
+    legalStatus: 'Non-MLC'
+  },
+  {
+    id: '10',
+    uhid: 'MMC-KR-24-010',
+    name: 'Arjun S',
+    age: 22,
+    gender: 'Male',
+    mobile: '7766554433',
+    type: PatientType.IPD,
+    hospital: HospitalName.KR_HOSPITAL,
+    department: Department.DERMATOLOGY,
+    admissionDate: '2024-05-16',
+    ward: 'Skin & VD Ward',
+    bedNumber: 'DERM-1',
+    diagnosis: 'Pemphigus Vulgaris',
+    doctor: 'Dr. Arun',
+    status: 'Active',
+    legalStatus: 'Non-MLC'
   }
 ];
 
@@ -588,7 +779,7 @@ export const MOCK_WARDS: Ward[] = [
         hospital: HospitalName.KR_HOSPITAL,
         department: Department.ENT,
         type: 'General',
-        beds: generateBeds('ENT', 8, [0, 1])
+        beds: generateBeds('ENT', 8, [1], ['8']) // Patient 8 is here
     },
     {
         id: 'W-KR-OPH1',
@@ -596,7 +787,23 @@ export const MOCK_WARDS: Ward[] = [
         hospital: HospitalName.KR_HOSPITAL,
         department: Department.OPHTHALMOLOGY,
         type: 'General',
-        beds: generateBeds('OPH', 8, [3])
+        beds: generateBeds('OPH', 8, [3], ['9']) // Patient 9 is here
+    },
+    {
+        id: 'W-KR-DERM1',
+        name: 'Skin & VD Ward',
+        hospital: HospitalName.KR_HOSPITAL,
+        department: Department.DERMATOLOGY,
+        type: 'General',
+        beds: generateBeds('DERM', 6, [0], ['10']) // Patient 10 is here
+    },
+    {
+        id: 'W-KR-PSY1',
+        name: 'Psychiatry Ward',
+        hospital: HospitalName.KR_HOSPITAL,
+        department: Department.PSYCHIATRY,
+        type: 'General',
+        beds: generateBeds('PSY', 10, [])
     },
     {
         id: 'W-KR-MICU',
@@ -758,6 +965,26 @@ export const MOCK_ROUNDS: RoundNote[] = [
     doctor: 'Dr. Suresh',
     note: 'Tolerating soft diet well. Surgical site clean. Plan discharge tomorrow.',
     vitals: 'BP: 118/76, HR: 80'
+  },
+  {
+    id: 'R-DOC-001',
+    patientId: '1',
+    date: '2025-12-11 12:28',
+    doctor: 'Super Administrator',
+    note: 'Nithin krishna.jpg',
+    vitals: 'Report Attached',
+    attachmentUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=800&auto=format&fit=crop',
+    attachmentType: 'image'
+  },
+  {
+    id: 'R-DOC-002',
+    patientId: '1',
+    date: '2025-12-11 13:00',
+    doctor: 'Super Administrator',
+    note: 'betta (1).jpg',
+    vitals: 'Report Attached',
+    attachmentUrl: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?q=80&w=800&auto=format&fit=crop',
+    attachmentType: 'image'
   },
   {
     id: 'R-003',

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 
@@ -26,99 +25,83 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   disabled = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedOption = options.find(o => o.value === value);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
-    };
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [wrapperRef]);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+    if (!isOpen) {
+        setSearchTerm('');
+    }
+  }, [isOpen]);
 
   const filteredOptions = options.filter(option =>
-    option.label.toLowerCase().includes(search.toLowerCase())
+    option.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Grouping logic
-  const groupedOptions: { [key: string]: Option[] } = {};
-  filteredOptions.forEach(opt => {
-      const group = opt.group || 'Other';
-      if (!groupedOptions[group]) groupedOptions[group] = [];
-      groupedOptions[group].push(opt);
-  });
-  const hasGroups = options.some(o => o.group);
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearchTerm('');
+  };
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className}`} ref={wrapperRef}>
       <div
-        className={`w-full px-4 py-2.5 bg-white border rounded-lg text-sm flex items-center justify-between cursor-pointer transition-all ${
-          disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'border-slate-300 hover:border-blue-400'
-        } ${isOpen ? 'ring-2 ring-blue-500/20 border-blue-500' : ''}`}
+        className={`w-full px-4 py-3 bg-slate-50 border ${isOpen ? 'border-blue-500 ring-4 ring-blue-500/10' : 'border-slate-200'} rounded-xl text-sm font-semibold text-slate-700 cursor-pointer flex justify-between items-center transition-all ${disabled ? 'opacity-70 cursor-not-allowed' : 'hover:border-blue-300'}`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
-        <span className={`truncate ${!selectedOption ? 'text-slate-400' : 'text-slate-700 font-medium'}`}>
+        <span className={`block truncate mr-2 ${selectedOption ? 'text-slate-700' : 'text-slate-400 font-normal'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 flex flex-col animate-in fade-in zoom-in-95 duration-100">
-          <div className="p-2 border-b border-slate-100 sticky top-0 bg-white rounded-t-lg">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="text"
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+          <div className="p-2 border-b border-slate-100 relative">
+            <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+            <input
+              ref={inputRef}
+              type="text"
+              className="w-full pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
-          
-          <div className="overflow-y-auto flex-1 p-1 custom-scrollbar">
+          <div className="overflow-y-auto flex-1 custom-scrollbar p-1">
             {filteredOptions.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-400">No options found</div>
-            ) : hasGroups ? (
-                 Object.entries(groupedOptions).map(([group, opts]) => (
-                     <div key={group}>
-                         {group !== 'Other' && <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50">{group}</div>}
-                         {opts.map(option => (
-                             <div
-                                key={option.value}
-                                className={`px-3 py-2 text-sm rounded cursor-pointer ${value === option.value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
-                                onClick={() => {
-                                    onChange(option.value);
-                                    setIsOpen(false);
-                                    setSearch("");
-                                }}
-                             >
-                                {option.label}
-                             </div>
-                         ))}
-                     </div>
-                 ))
+              <div className="px-4 py-3 text-sm text-slate-400 text-center">No results found</div>
             ) : (
-              filteredOptions.map(option => (
+              filteredOptions.map((option) => (
                 <div
                   key={option.value}
-                  className={`px-3 py-2 text-sm rounded cursor-pointer ${value === option.value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                    setSearch("");
-                  }}
+                  className={`px-4 py-2.5 text-sm cursor-pointer rounded-lg transition-colors ${value === option.value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
+                  onClick={() => handleSelect(option.value)}
                 >
-                  {option.label}
+                  <div className="flex items-center justify-between">
+                    <span>{option.label}</span>
+                    {option.group && <span className="ml-2 text-[10px] text-slate-400 font-normal border border-slate-100 px-1 rounded bg-white">{option.group}</span>}
+                  </div>
                 </div>
               ))
             )}

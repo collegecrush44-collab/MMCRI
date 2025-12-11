@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, ExternalLink, Stethoscope, ArrowRight, CheckCircle } from 'lucide-react';
+import { MessageSquare, ExternalLink, Stethoscope, ArrowRight, CheckCircle, Mic } from 'lucide-react';
 import { ReferralType, Referral } from '../types';
 
 interface DelloPlusProps {
@@ -10,6 +10,25 @@ interface DelloPlusProps {
 const DelloPlus: React.FC<DelloPlusProps> = ({ referrals, onAcceptReferral }) => {
   // Only show External Dello+ Referrals
   const externalReferrals = referrals.filter(ref => ref.type === ReferralType.EXTERNAL);
+
+  // Speech Recognition Helper
+  const startListening = (setter: (val: string) => void, currentVal: string = '') => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setter(currentVal ? `${currentVal} ${transcript}` : transcript);
+      };
+      recognition.start();
+    } else {
+      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+    }
+  };
+
+  const [chatMessage, setChatMessage] = React.useState('');
 
   return (
     <div className="space-y-6 animate-slide-down">
@@ -104,13 +123,16 @@ const DelloPlus: React.FC<DelloPlusProps> = ({ referrals, onAcceptReferral }) =>
                 </div>
             </div>
 
-            <div className="p-3 border-t border-slate-100">
+            <div className="p-3 border-t border-slate-100 relative">
                 <div className="flex gap-2">
                     <input 
                         type="text" 
                         placeholder="Type a message..."
-                        className="flex-grow px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                        className="flex-grow px-3 py-2 pr-10 border border-slate-200 rounded-lg text-sm outline-none focus:border-purple-500"
+                        value={chatMessage}
+                        onChange={(e) => setChatMessage(e.target.value)}
                     />
+                    <button onClick={() => startListening(setChatMessage, chatMessage)} className="absolute right-14 top-5 text-slate-400 hover:text-purple-600" title="Speech to Text"><Mic className="w-4 h-4"/></button>
                     <button className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                         <ArrowRight className="w-4 h-4" />
                     </button>

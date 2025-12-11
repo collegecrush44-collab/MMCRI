@@ -45,3 +45,33 @@ export const generateDischargeSummary = async (
     return "Error generating discharge summary. Please check your network connection or API quota.";
   }
 };
+
+export const searchPlaces = async (query: string) => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    return { text: "API Key missing. Cannot search places.", chunks: [] };
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: query,
+      config: {
+        tools: [{ googleMaps: {} }],
+      },
+    });
+
+    // Extract grounding chunks which contain map data
+    // The structure typically involves `groundingMetadata.groundingChunks`
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.web || c.maps).filter(Boolean) || [];
+    
+    return {
+      text: response.text,
+      chunks: chunks
+    };
+  } catch (error) {
+    console.error("Gemini Places Search Error:", error);
+    return { text: "Error searching places. Please try again.", chunks: [] };
+  }
+};

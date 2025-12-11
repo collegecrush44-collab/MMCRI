@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Patient, HospitalName, Department, TriagePriority, PatientType, Ward, BedStatus, Invoice } from '../types';
-import { AlertCircle, Plus, Search, Clock, Activity, ArrowRight, BedDouble, Siren, UserPlus, Gavel, X, Edit2 } from 'lucide-react';
+import { Patient, HospitalName, Department, TriagePriority, PatientType, Ward, BedStatus, Invoice, OTSchedule } from '../types';
+import { AlertCircle, Plus, Search, Clock, Activity, ArrowRight, BedDouble, Siren, UserPlus, Gavel, X, Edit2, Mic, Scissors } from 'lucide-react';
 import { HOSPITAL_DEPARTMENTS } from '../services/mockData';
 import SearchableSelect from './SearchableSelect';
 
@@ -13,9 +13,10 @@ interface EmergencyProps {
     wards: Ward[];
     updateBedStatus: (wardId: string, bedId: string, status: BedStatus, patientId?: string) => void;
     selectedHospital: HospitalName | 'All';
+    onAddOtSchedule?: (schedule: OTSchedule) => void;
 }
 
-const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoice, onUpdatePatient, wards, updateBedStatus, selectedHospital }) => {
+const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoice, onUpdatePatient, wards, updateBedStatus, selectedHospital, onAddOtSchedule }) => {
     const [view, setView] = useState<'triage' | 'register'>('triage');
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [showIcuModal, setShowIcuModal] = useState(false);
@@ -53,6 +54,23 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
             case TriagePriority.GREEN: return 'bg-green-100 text-green-800 border-green-200';
             case TriagePriority.BLACK: return 'bg-slate-800 text-slate-100 border-slate-700';
             default: return 'bg-slate-100 text-slate-800';
+        }
+    };
+
+    // Speech Recognition Helper
+    const startListening = (setter: (val: string) => void, currentVal: string = '') => {
+        if ('webkitSpeechRecognition' in window) {
+        const recognition = new (window as any).webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setter(currentVal ? `${currentVal} ${transcript}` : transcript);
+        };
+        recognition.start();
+        } else {
+        alert("Speech recognition is not supported in this browser. Please use Chrome.");
         }
     };
 
@@ -160,6 +178,27 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
         }
     };
 
+    const handleMoveToOT = (patient: Patient) => {
+        if (!onAddOtSchedule) return;
+        
+        if (confirm(`Schedule emergency surgery for ${patient.name}?`)) {
+            const newSurgery: OTSchedule = {
+                id: `OT-${Date.now().toString().slice(-4)}`,
+                patientId: patient.id,
+                procedureName: 'Emergency Procedure',
+                diagnosis: patient.diagnosis || 'Trauma',
+                theaterId: 'OT-3 (Emergency)',
+                surgeon: patient.doctor || 'Duty Surgeon',
+                scheduledTime: new Date().toISOString(), // NOW
+                status: 'Scheduled',
+                hospital: patient.hospital,
+                anesthesiaType: 'GA'
+            };
+            onAddOtSchedule(newSurgery);
+            alert(`Surgery scheduled in OT-3 for ${patient.name}.`);
+        }
+    };
+
     const openEditPatient = (p: Patient) => {
         setEditingPatient(p);
         setEditForm({ name: p.name, age: p.age, gender: p.gender, mobile: p.mobile, diagnosis: p.diagnosis });
@@ -170,6 +209,9 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
         onUpdatePatient({ ...editingPatient, ...editForm } as Patient);
         setEditingPatient(null);
     };
+
+    const inputClass = "w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed";
+    const labelClass = "block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 ml-1";
 
     return (
         <div className="space-y-6 animate-slide-down">
@@ -197,9 +239,9 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                     <form onSubmit={handleQuickRegister} className="space-y-6">
                         <div className="grid grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Triage Priority</label>
+                                <label className={labelClass}>Triage Priority</label>
                                 <select 
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm"
+                                    className={`${inputClass} font-bold`}
                                     value={regForm.triage}
                                     onChange={e => setRegForm({...regForm, triage: e.target.value as TriagePriority})}
                                 >
@@ -209,17 +251,20 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Assigned Doctor</label>
-                                <input type="text" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={regForm.doctor} onChange={e => setRegForm({...regForm, doctor: e.target.value})} />
+                                <label className={labelClass}>Assigned Doctor</label>
+                                <input type="text" className={inputClass} value={regForm.doctor} onChange={e => setRegForm({...regForm, doctor: e.target.value})} />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-6">
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Name</label><input required type="text" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Name or Unknown" value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Age & Gender</label>
+                            <div>
+                                <label className={labelClass}>Patient Name <button type="button" onClick={() => startListening((val) => setRegForm({...regForm, name: val}), regForm.name)} className="ml-2 text-blue-600 hover:bg-blue-100 p-0.5 rounded-full inline-block" title="Speech to Text"><Mic className="w-3 h-3 inline"/></button></label>
+                                <input required type="text" className={inputClass} placeholder="Name or Unknown" value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} />
+                            </div>
+                            <div><label className={labelClass}>Age & Gender</label>
                                 <div className="flex gap-2">
-                                    <input required type="number" className="w-20 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Age" value={regForm.age} onChange={e => setRegForm({...regForm, age: e.target.value})} />
-                                    <select className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" value={regForm.gender} onChange={e => setRegForm({...regForm, gender: e.target.value})}>
+                                    <input required type="number" className={`w-24 ${inputClass}`} placeholder="Age" value={regForm.age} onChange={e => setRegForm({...regForm, age: e.target.value})} />
+                                    <select className={`flex-1 ${inputClass}`} value={regForm.gender} onChange={e => setRegForm({...regForm, gender: e.target.value})}>
                                         <option>Male</option><option>Female</option><option>Other</option>
                                     </select>
                                 </div>
@@ -227,7 +272,7 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                         </div>
 
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Legal Case Status (MLC)</label>
+                            <label className={labelClass}>Legal Case Status (MLC)</label>
                             <div className="flex gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded border border-slate-200 hover:border-slate-300">
                                     <input
@@ -256,7 +301,10 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                             </div>
                         </div>
 
-                        <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chief Complaint / Injury</label><input required type="text" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="e.g. RTA, Chest Pain..." value={regForm.complaint} onChange={e => setRegForm({...regForm, complaint: e.target.value})} /></div>
+                        <div>
+                            <label className={labelClass}>Chief Complaint / Injury <button type="button" onClick={() => startListening((val) => setRegForm({...regForm, complaint: val}), regForm.complaint)} className="ml-2 text-blue-600 hover:bg-blue-100 p-0.5 rounded-full inline-block" title="Speech to Text"><Mic className="w-3 h-3 inline"/></button></label>
+                            <input required type="text" className={inputClass} placeholder="e.g. RTA, Chest Pain..." value={regForm.complaint} onChange={e => setRegForm({...regForm, complaint: e.target.value})} />
+                        </div>
                         
                         <button type="submit" className="w-full py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-md">Register & Triage</button>
                     </form>
@@ -305,8 +353,11 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                                         >
                                             Admit to ICU <ArrowRight className="w-4 h-4" />
                                         </button>
-                                        <button className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50">
-                                            Move to OT
+                                        <button 
+                                            onClick={() => handleMoveToOT(p)}
+                                            className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 flex items-center gap-2 justify-center"
+                                        >
+                                            <Scissors className="w-4 h-4" /> Move to OT
                                         </button>
                                     </div>
                                 </div>
@@ -362,37 +413,39 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
             {/* Edit Patient Modal */}
             {editingPatient && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
-                        <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="p-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
                             <h3 className="font-bold text-lg text-slate-800">Edit Patient Details</h3>
                             <button onClick={() => setEditingPatient(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
-                                <input type="text" className="w-full p-2 border rounded" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                                <label className={labelClass}>Full Name</label>
+                                <input type="text" className={inputClass} value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
-                                    <input type="number" className="w-full p-2 border rounded" value={editForm.age} onChange={e => setEditForm({...editForm, age: parseInt(e.target.value) || 0})} />
+                                    <label className={labelClass}>Age</label>
+                                    <input type="number" className={inputClass} value={editForm.age} onChange={e => setEditForm({...editForm, age: parseInt(e.target.value) || 0})} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
-                                    <select className="w-full p-2 border rounded" value={editForm.gender} onChange={e => setEditForm({...editForm, gender: e.target.value as any})}>
+                                    <label className={labelClass}>Gender</label>
+                                    <select className={inputClass} value={editForm.gender} onChange={e => setEditForm({...editForm, gender: e.target.value as any})}>
                                         <option>Male</option><option>Female</option><option>Other</option>
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile</label>
-                                <input type="text" className="w-full p-2 border rounded" value={editForm.mobile} onChange={e => setEditForm({...editForm, mobile: e.target.value})} />
+                                <label className={labelClass}>Mobile</label>
+                                <input type="text" className={inputClass} value={editForm.mobile} onChange={e => setEditForm({...editForm, mobile: e.target.value})} />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Diagnosis</label>
-                                <input type="text" className="w-full p-2 border rounded" value={editForm.diagnosis} onChange={e => setEditForm({...editForm, diagnosis: e.target.value})} />
+                                <label className={labelClass}>Diagnosis</label>
+                                <input type="text" className={inputClass} value={editForm.diagnosis} onChange={e => setEditForm({...editForm, diagnosis: e.target.value})} />
                             </div>
-                            <button onClick={saveEditedPatient} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 mt-2">Save Changes</button>
+                        </div>
+                        <div className="p-5 border-t border-slate-100 flex-shrink-0">
+                            <button onClick={saveEditedPatient} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Save Changes</button>
                         </div>
                     </div>
                 </div>,
@@ -402,18 +455,18 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
             {/* ICU Admission Modal Portal */}
             {showIcuModal && selectedPatient && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-slate-100 bg-red-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-slate-100 bg-red-50 flex-shrink-0">
                             <h3 className="text-lg font-bold text-red-800 flex items-center gap-2">
                                 <BedDouble className="w-5 h-5" /> Admit to Critical Care (ICU)
                             </h3>
                             <p className="text-sm text-red-600 mt-1">Transferring: {selectedPatient.name} ({selectedPatient.uhid})</p>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select ICU Ward</label>
+                                <label className={labelClass}>Select ICU Ward</label>
                                 <select 
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                                    className={inputClass}
                                     value={icuForm.wardId}
                                     onChange={e => setIcuForm({...icuForm, wardId: e.target.value, bedId: ''})}
                                 >
@@ -422,9 +475,9 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Bed</label>
+                                <label className={labelClass}>Select Bed</label>
                                 <select 
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                                    className={inputClass}
                                     value={icuForm.bedId}
                                     onChange={e => setIcuForm({...icuForm, bedId: e.target.value})}
                                     disabled={!icuForm.wardId}
@@ -436,14 +489,13 @@ const Emergency: React.FC<EmergencyProps> = ({ patients, onRegister, onAddInvoic
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Admitting Specialist</label>
-                                <input type="text" className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm" placeholder="Doctor Name" value={icuForm.doctor} onChange={e => setIcuForm({...icuForm, doctor: e.target.value})} />
+                                <label className={labelClass}>Admitting Specialist</label>
+                                <input type="text" className={inputClass} placeholder="Doctor Name" value={icuForm.doctor} onChange={e => setIcuForm({...icuForm, doctor: e.target.value})} />
                             </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <button onClick={() => setShowIcuModal(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200">Cancel</button>
-                                <button onClick={handleIcuAdmission} className="flex-1 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-md">Confirm Transfer</button>
-                            </div>
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex gap-3 flex-shrink-0">
+                            <button onClick={() => setShowIcuModal(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-lg hover:bg-slate-200">Cancel</button>
+                            <button onClick={handleIcuAdmission} className="flex-1 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-md">Confirm Transfer</button>
                         </div>
                     </div>
                 </div>,
