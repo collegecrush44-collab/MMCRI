@@ -1,0 +1,5 @@
+{
+  "name": "MMC&RI HMIS",
+  "description": "Integrated Hospital Management System for Mysore Medical College & Research Institute featuring OPD/IPD workflows, ABDM integration, Clinical modules, and Dello+ referral connectivity.",
+  "requestFramePermissions": []
+}
